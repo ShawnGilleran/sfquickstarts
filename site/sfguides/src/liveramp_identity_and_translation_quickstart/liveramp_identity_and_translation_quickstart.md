@@ -125,7 +125,9 @@ Duration: 2
 
 More details for this step can be found [here](https://docs.liveramp.com/identity/en/perform-identity-resolution-in-snowflake.html#perform-the-identity-resolution-operation)
 
-The following SQL will execute the identity resolution process. The stored procedure will. be located in your Snowflake account. It will be listed under the 
+The following SQL will execute the identity resolution process. The stored procedure will be located in your Snowflake account. It will be listed under the LiveRamp native application in the LR_APP_SCHEMA under the Procedures.
+
+
 You need to replace the following variable below
 * <customer_input_table_name> - Name of the Input table built in the previous step
 * <customer_meta_table_name> - Name of the Metadata table built in the previous step
@@ -149,15 +151,9 @@ call lr_resolution_and_transcoding(
 >  **Execution Note**
 This process will execute inside your warehouse, so do not kill this process
 
-When the above process completes you will need to run one more process to get the output table visible in your warehouse. You will use the output_table variable from the initial job invocation
+If you receive an error the [codes](https://docs.liveramp.com/identity/en/snowflake-operation-error-codes.html) can be found in the LiveRamp documentation
 
-```
-call check_for_output(
-	$output_table_name
-);
-```
-
-A table should now be visible in your Snowflake warehouse under the LiveRamp native application
+A table should now be visible in your Snowflake warehouse under the LiveRamp native application in the LR_JOB_SCHEMA as a table.
 
 ## Audit the Identity Resolution Process
 Duration: 2
@@ -203,11 +199,23 @@ It is also recommended to look at the number of [maintained](https://docs.livera
 ```
 SELECT 
     SUBSTR(RAMPID, 1, 2) AS first_two_chars,
-    COUNT(*) AS frequency
+    COUNT(*) AS frequency,
+    CASE
+        WHEN SUBSTR(RAMPID, 1, 2) = 'XY' THEN 'Maintained'
+        WHEN SUBSTR(RAMPID, 1, 2) = 'Xi' THEN 'Derived'
+        WHEN SUBSTR(RAMPID, 1, 1) = '0' THEN 'OptOut'
+        ELSE 'Other'
+    END AS status
 FROM 
     identifier($final_output)
 GROUP BY 
-    SUBSTR(RAMPID, 1, 2)
+    SUBSTR(RAMPID, 1, 2),
+    CASE
+        WHEN SUBSTR(RAMPID, 1, 2) = 'XY' THEN 'Maintained'
+        WHEN SUBSTR(RAMPID, 1, 2) = 'Xi' THEN 'Derived'
+        WHEN SUBSTR(RAMPID, 1, 1) = '0' THEN 'OptOut'
+        ELSE 'Other'
+    END
 ORDER BY 
     frequency DESC;
 ```
@@ -320,17 +328,11 @@ call lr_resolution_and_transcoding(
 > aside negative
 > 
 >  **Execution Note**
-This process will execute inside your warehouse, so do not kill this process
+This process will execute inside your warehouse, so do not kill this process.
 
-When the above process completes you will need to run one more process to get the output table visible in your warehouse. You will use the output_table variable from the initial job invocation
+If you receive an error the [codes](https://docs.liveramp.com/identity/en/snowflake-operation-error-codes.html) can be found in the LiveRamp documentation
 
-```
-call check_for_output(
-	$output_table_name
-);
-```
-
-A table should now be visible in your Snowflake warehouse under the LiveRamp native application
+A table should now be visible in your Snowflake warehouse under the LiveRamp native application in the LR_JOB_SCHEMA as a table.
 
 ## Auditing Translation
 Duration: 2
@@ -344,7 +346,7 @@ Set Up some variables for use in the SQL below. You will need the following:
 ```
 -- setting the input table for the rest of the script
 set audit_table = 'your Transcoding Output';
-set audit_table_output = 'Extr Audit Table';
+set audit_table_output = 'Extra Audit Table';
 ```
 
 Once you have set up the variables you can execute the different audits
